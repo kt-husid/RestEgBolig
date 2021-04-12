@@ -23,9 +23,8 @@ namespace RestEgBolig.Controllers
             /**************** FROM WEB SERVICE ****************/
             string cprNoFormatted = cprNo.Insert(6, "0");
 
-            RestEgBolig.EgBoligService.Service10540Client svc = new RestEgBolig.EgBoligService.Service10540Client();
-            RestEgBolig.EgBoligService.Member[] memberFromService = svc.MemberGetListByCprNo(cprNoFormatted, false);
-
+            EgBoligService.Service10540Client svc = new EgBoligService.Service10540Client();
+            EgBoligService.Member[] memberFromService = svc.MemberGetListByCprNo(cprNoFormatted, false);
 
             /**************** FROM DATABASE ****************/
 
@@ -105,7 +104,7 @@ namespace RestEgBolig.Controllers
 
         [HttpPut]
         [Route("updateMember")]
-        public string UpdateMember(string cprNo, string country, string postalCodeCity, string address, string email, string homePhone, string mobilePhone, short children, [FromBody] string comment)
+        public string UpdateMember(string cprNo, string country, string postalCodeCity, string address, string email, string homePhone, string mobilePhone, short children, string comment)
         {
 
             /**************** FROM WEB SERVICE ****************/
@@ -459,6 +458,8 @@ namespace RestEgBolig.Controllers
                     }
                 }
             }
+
+            cn.Close();
 
             return "Not possible!";
         }
