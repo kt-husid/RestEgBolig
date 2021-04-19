@@ -413,55 +413,130 @@ namespace RestEgBolig.Controllers
             return "Wish deleted!";
         }
 
-        [HttpPut]
-        [Route("changeStatus")]
-        public string ChangeStatus(string cprNo, string lmType, string status)
+        [HttpGet]
+        [Route("getMembershipListByCPR")]
+        public List<Membership> GetMembershipListByCPR(string cprNo)
         {
             /**************** FROM WEB SERVICE ****************/
             string cprNoFormatted = cprNo.Insert(6, "0");
 
-            RestEgBolig.EgBoligService.Service10540Client svc = new RestEgBolig.EgBoligService.Service10540Client();
-            RestEgBolig.EgBoligService.Member[] memberFromService = svc.MemberGetListByCprNo(cprNoFormatted, false);
+            EgBoligService.Service10540Client svc = new EgBoligService.Service10540Client();
+            EgBoligService.Member[] memberFromService = svc.MemberGetListByCprNo(cprNoFormatted, false);
+            
+            List<Membership> MembershipList = new List<Membership>();
+
+            if(memberFromService.Length != 0)
+            {
+                short memberCompanyNo = memberFromService[0].MemberCompanyNo;
+                decimal memberNo = memberFromService[0].MemberNo;
+
+                EgBoligService.Membership[] membershipsFromService = svc.MembershipGetList(memberCompanyNo, memberNo, true);
+
+                foreach (EgBoligService.Membership membershipFromService in membershipsFromService)
+                {
+                    Membership membership = new Membership();
+
+                    membership.CompanyNo = membershipFromService.CompanyNo;
+                    membership.MemberCompanyNo = membershipFromService.MemberCompanyNo;
+                    membership.MemberNo = membershipFromService.MemberNo;
+                    membership.TenancyType = membershipFromService.TenancyType;
+                    membership.Status = membershipFromService.Status;
+                    membership.ActivationDate = membershipFromService.ActivationDate;
+                    membership.JoinDate = membershipFromService.JoinDate;
+                    membership.QuitDate = membershipFromService.QuitDate;
+                    membership.RenewalDate = membershipFromService.RenewalDate;
+                    membership.SuspendedToDate = membershipFromService.SuspendedToDate;
+
+                    MembershipList.Add(membership);
+                }
+            }
+            return MembershipList;
+        }
+
+        [HttpPut]
+        [Route("suspendMembership")]
+        public string SuspendMemebership(string cprNo, short lmType)
+        {
+            /**************** FROM WEB SERVICE ****************/
+            string cprNoFormatted = cprNo.Insert(6, "0");
+
+            EgBoligService.Service10540Client svc = new EgBoligService.Service10540Client();
+            EgBoligService.Member[] memberFromService = svc.MemberGetListByCprNo(cprNoFormatted, false);
 
             short memberCompanyNo = memberFromService[0].MemberCompanyNo;
             decimal memberNo = memberFromService[0].MemberNo;
 
-            /**************** FROM DATABASE ****************/
+            EgBoligService.Membership[] membershipsFromService = svc.MembershipGetList(memberCompanyNo, memberNo, true);
 
-            SqlConnection cn = new SqlConnection(@"Data Source=HAXDMA49; Initial Catalog=Bolig2; Integrated Security=False; User ID=EGBoligWS; Password=zYnc6hvWeytL9AVe; Multipleactiveresultsets=True; App=EntityFramework");
-
-            // SQL for status type 7 in MedlemAfSelskab table in Bolig2 database
-            string sqlGet = "select Top(1) status, lmtype from [Bolig2].[dbo].[MedlemAfSelskab] where sel = " + memberCompanyNo + " and medlem = " + memberNo + " and lmtype = " + lmType;
-            SqlCommand cmd = new SqlCommand(sqlGet, cn);
-
-            string sqlSet = "update [Bolig2].[dbo].[MedlemAfSelskab] set status = " + status + " where sel = " + memberCompanyNo + " and medlem = " + memberNo + " and lmtype =" + lmType;
-            SqlCommand cmd1 = new SqlCommand(sqlSet, cn);
-
-            cn.Open();
-
-            // get dat from MedlemAfSelskab table
-            using (SqlDataReader dr = cmd.ExecuteReader())
+            foreach (EgBoligService.Membership membershipFromService in membershipsFromService)
             {
-                if (dr.Read())
+                if (membershipFromService.TenancyType == lmType & membershipFromService.Status == "0")
                 {
-                    if (dr["lmtype"].ToString() == "1" || dr["lmtype"].ToString() == "4" || dr["lmtype"].ToString() == "7")
-                    {
-                        if (dr["status"].ToString() != "0" && status == "0" || dr["status"].ToString() != "1" && status == "1" || dr["status"].ToString() != "3" && status == "3")
-                        {
-                            cmd1.ExecuteReader();
-                            return "LMType " + lmType + " changed status to " + status;
-                        }
-                        else
-                        {
-                            return "Status " + status + " is invalid";
-                        }
-                    }
+                    EgBoligService.Membership membership = new EgBoligService.Membership();
+
+                    membership.ActivationDate = membershipFromService.ActivationDate;
+                    membership.CompanyNo = membershipFromService.CompanyNo;
+                    membership.ExcemptFromFees = membershipFromService.ExcemptFromFees;
+                    membership.JoinDate = membershipFromService.JoinDate;
+                    membership.MemberCompanyNo = membershipFromService.MemberCompanyNo;
+                    membership.MemberNo = membershipFromService.MemberNo;
+                    membership.NewStatus = "1";
+                    membership.QuitDate = membershipFromService.QuitDate;
+                    membership.RenewalDate = membershipFromService.RenewalDate;
+                    membership.Status = membershipFromService.Status;
+                    membership.SuspendedToDate = membershipFromService.SuspendedToDate;
+                    membership.TenancyType = membershipFromService.TenancyType;
+                    membership.WaitListType = membershipFromService.WaitListType;
+                    
+                    svc.MembershipSuspendMembership(membership);
+
+                    return "Membership with lmtype " + lmType + " is suspended.";
                 }
             }
+            return "Membership with lmtype " + lmType + " did not get changed!";
+        }
 
-            cn.Close();
+        [HttpPut]
+        [Route("activateMembership")]
+        public string ActivateMembership(string cprNo, short lmType)
+        {
+            /**************** FROM WEB SERVICE ****************/
+            string cprNoFormatted = cprNo.Insert(6, "0");
 
-            return "Not possible!";
+            EgBoligService.Service10540Client svc = new EgBoligService.Service10540Client();
+            EgBoligService.Member[] memberFromService = svc.MemberGetListByCprNo(cprNoFormatted, false);
+
+            short memberCompanyNo = memberFromService[0].MemberCompanyNo;
+            decimal memberNo = memberFromService[0].MemberNo;
+
+            EgBoligService.Membership[] membershipsFromService = svc.MembershipGetList(memberCompanyNo, memberNo, true);
+
+            foreach (EgBoligService.Membership membershipFromService in membershipsFromService)
+            {
+                if (membershipFromService.TenancyType == lmType & membershipFromService.Status == "1")
+                {
+                    EgBoligService.Membership membership = new EgBoligService.Membership();
+
+                    membership.ActivationDate = membershipFromService.ActivationDate;
+                    membership.CompanyNo = membershipFromService.CompanyNo;
+                    membership.ExcemptFromFees = membershipFromService.ExcemptFromFees;
+                    membership.JoinDate = membershipFromService.JoinDate;
+                    membership.MemberCompanyNo = membershipFromService.MemberCompanyNo;
+                    membership.MemberNo = membershipFromService.MemberNo;
+                    membership.NewStatus = "0";
+                    membership.QuitDate = membershipFromService.QuitDate;
+                    membership.RenewalDate = membershipFromService.RenewalDate;
+                    membership.Status = membershipFromService.Status;
+                    membership.SuspendedToDate = membershipFromService.SuspendedToDate;
+                    membership.TenancyType = membershipFromService.TenancyType;
+                    membership.WaitListType = membershipFromService.WaitListType;
+
+                    svc.MembershipActivateMembership(membership);
+
+                    return "Membership with lmtype " + lmType + " is activated.";
+                }
+            }
+            return "Membership with lmtype " + lmType + " did not get changed!";
         }
     }
 }
