@@ -158,7 +158,7 @@ namespace RestEgBolig.Controllers
         }
 
         [HttpGet]
-        [Route("GetAllDepartments")]
+        [Route("getAllDepartments")]
         public List<WaitListObject> GetAllDepartments()
         {
             // connectionstring
@@ -200,8 +200,8 @@ namespace RestEgBolig.Controllers
                     wishListObject.CompanyNo = company;
                     wishListObject.DepartmentNo = department;
                     wishListObject.Type = type;
-                    wishListObject.Name = name;
-                    wishListObject.Address = address;
+                    wishListObject.Name = name.Split(new Char[] { ';' })[0]; // everything after ; is not being shown
+                    wishListObject.Address = address.Split(new Char[] { ';' })[0];
                     wishListObject.PostalCodeCity = postalCodeCity;
                     wishListObject.Rooms = rooms;
                     wishListObject.Amount = amount;
@@ -535,6 +535,55 @@ namespace RestEgBolig.Controllers
 
                     return "Membership with lmtype " + lmType + " is activated.";
                 }
+            }
+            return "Membership with lmtype " + lmType + " did not get changed!";
+        }
+
+        [HttpPut]
+        [Route("deleteMembership")]
+        public string DeleteMembership(string cprNo, short lmType)
+        {
+            /**************** FROM WEB SERVICE ****************/
+            string cprNoFormatted = cprNo.Insert(6, "0");
+
+            EgBoligService.Service10540Client svc = new EgBoligService.Service10540Client();
+            EgBoligService.Member[] memberFromService = svc.MemberGetListByCprNo(cprNoFormatted, false);
+
+            short memberCompanyNo = memberFromService[0].MemberCompanyNo;
+            decimal memberNo = memberFromService[0].MemberNo;
+
+            EgBoligService.Membership[] membershipsFromService = svc.MembershipGetList(memberCompanyNo, memberNo, true);
+
+            foreach (EgBoligService.Membership membershipFromService in membershipsFromService)
+            {
+                // Not possible to delete lmtype 1, because it is the main lmtype that the member pays for
+                if(lmType != 1)
+                {
+                    if (membershipFromService.TenancyType == lmType & (membershipFromService.Status == "1" || membershipFromService.Status == "0"))
+                    {
+                        EgBoligService.Membership membership = new EgBoligService.Membership();
+
+                        membership.ActivationDate = membershipFromService.ActivationDate;
+                        membership.CompanyNo = membershipFromService.CompanyNo;
+                        membership.ExcemptFromFees = membershipFromService.ExcemptFromFees;
+                        membership.JoinDate = membershipFromService.JoinDate;
+                        membership.MemberCompanyNo = membershipFromService.MemberCompanyNo;
+                        membership.MemberNo = membershipFromService.MemberNo;
+                        membership.NewStatus = "3";
+                        membership.QuitDate = membershipFromService.QuitDate;
+                        membership.RenewalDate = membershipFromService.RenewalDate;
+                        membership.Status = membershipFromService.Status;
+                        membership.SuspendedToDate = membershipFromService.SuspendedToDate;
+                        membership.TenancyType = membershipFromService.TenancyType;
+                        membership.WaitListType = membershipFromService.WaitListType;
+
+                        svc.MembershipDeleteMembership(membership);
+
+                        return "Membership with lmtype " + lmType + " is deleted.";
+                    }
+
+                }
+                
             }
             return "Membership with lmtype " + lmType + " did not get changed!";
         }
